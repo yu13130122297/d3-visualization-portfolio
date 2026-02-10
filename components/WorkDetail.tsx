@@ -25,12 +25,12 @@ interface WorkDetailProps {
   next: VisualizationWork | null;
 }
 
+
 type RightPanelView = "info" | "code";
 
 export function WorkDetail({ work, prev, next }: WorkDetailProps) {
   const [fullscreen, setFullscreen] = useState(false);
   const [rightView, setRightView] = useState<RightPanelView>("info");
-
   const codeTabs = [
     { label: "核心代码", code: work.sourceCode.core },
     ...(work.sourceCode.data

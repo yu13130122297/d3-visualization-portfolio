@@ -1,6 +1,7 @@
 import type { VisualizationWork } from "@/types/work";
 import { ForceGraph, forceGraphCode } from "@/components/works/ForceGraph";
 import { StreamGraph, streamGraphCode } from "@/components/works/StreamGraph";
+import { TeachTree, teachTreeCode } from "@/components/works/TeachTree";
 
 export const workRegistry: VisualizationWork[] = [
   {
@@ -51,6 +52,31 @@ export const workRegistry: VisualizationWork[] = [
       createdAt: "2024-05-20",
       inspiration:
         "灵感来源于 Lee Byron 的 StreamGraph 和纽约时报的可视化。",
+    },
+  },
+  {
+    id: "teach-tree",
+    title: "教学交互模式分析",
+    subtitle: "课堂互动行为的模式挖掘与树形可视化",
+    description:
+      "一个教学交互模式分析系统，包含模式挖掘表和交互树。支持从课堂实录中挖掘教师与学生的行为模式，并以树形结构可视化展示。",
+    fullDescription:
+      "该系统通过分析课堂实录数据，将连续的相同行为合并，然后使用 N-gram 算法（N=2~15）挖掘所有出现的行为链模式。左侧的模式挖掘表展示所有发现的模式，按链长度和出现频次排序。右侧的交互树使用 D3.js 树形布局将模式组织成层次结构，节点大小表示该行为在模式中出现的聚合计数。用户可以点击表格中的模式，在树形图中高亮显示对应的路径，非相关节点会自动淡化。教师行为使用暖色系（橙色系），学生行为使用冷色系（蓝色系），沉默使用灰色，实现直观的行为类型区分。",
+    category: "network",
+    tags: ["D3.js", "Pattern Mining", "Hierarchical Data", "Interactive"],
+    component: TeachTree,
+    sourceCode: {
+      core: teachTreeCode.core,
+      data: teachTreeCode.data,
+      styles: teachTreeCode.styles,
+      full: teachTreeCode.full,
+    },
+    metadata: {
+      dataSource: "课堂实录 JSONL 数据",
+      tools: ["D3.js", "N-gram 算法", "树形布局"],
+      createdAt: "2024-06-01",
+      inspiration:
+        "基于课堂行为分析研究，将文本化的课堂实录转换为可视化的行为模式图谱。",
     },
   },
 ];
