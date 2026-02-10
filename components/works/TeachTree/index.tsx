@@ -25,6 +25,7 @@ export function TeachTree() {
     const [displayPatterns, setDisplayPatterns] = useState<PatternResult[]>([]);
     const [patternDetails, setPatternDetails] = useState<PatternDetailItem[] | null>(null);
     const [detailPattern, setDetailPattern] = useState<string | null>(null);
+    const [tableWidth, setTableWidth] = useState(340);
 
     useEffect(() => {
         fetch('/TeachTree.jsonl')
@@ -112,10 +113,41 @@ export function TeachTree() {
         setDetailPattern(null);
     }, []);
 
+    // 表格拖拽调整宽度
+    const [isResizing, setIsResizing] = useState(false);
+
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizing(true);
+
+        const startX = e.clientX;
+        const startWidth = tableWidth;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const diff = e.clientX - startX;
+            const newWidth = Math.max(280, Math.min(600, startWidth + diff));
+            setTableWidth(newWidth);
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    }, [tableWidth]);
+
     return (
-        <div className="flex h-screen bg-gray-50">
-            <div className="w-[340px] border-r border-gray-200 bg-white p-4 overflow-auto shadow-sm">
-                <h2 className="text-lg font-semibold mb-4 text-gray-800">Pattern Mining</h2>
+        <div className="flex flex-col lg:flex-row h-[100dvh] bg-gray-50">
+            <div
+                className={`border-r border-gray-200 bg-white overflow-hidden shadow-sm flex-shrink-0 transition-all duration-200 ${tableWidth < 300 ? 'p-2' : 'p-4'} w-full lg:w-auto`}
+                style={{ width: `${Math.max(280, Math.min(600, tableWidth))}px`, maxWidth: '100%' }}
+            >
+                <h2 className={`font-semibold text-gray-800 ${tableWidth < 300 ? 'text-sm mb-2' : 'text-lg mb-4'}`}>
+                    {tableWidth < 300 ? 'Patterns' : 'Pattern Mining'}
+                </h2>
                 <PatternMiningTable
                     data={displayPatterns as unknown as TableRow[]}
                     selectedPattern={selectedPattern}
@@ -123,7 +155,14 @@ export function TeachTree() {
                 />
             </div>
 
-            <div className="flex-1 p-6 overflow-auto">
+            {/* 拖拽调整宽度的手柄 - 仅在桌面端显示 */}
+            <div
+                className={`w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex-shrink-0 transition-colors hidden lg:block ${isResizing ? 'bg-blue-500' : ''}`}
+                onMouseDown={handleMouseDown}
+                title="拖拽调整宽度"
+            />
+
+            <div className="flex-1 p-4 lg:p-6 pt-0 overflow-auto min-w-0 min-h-0">
                 <InteractionTree
                     treeData={treeData}
                     visibleNodes={visibleNodes}

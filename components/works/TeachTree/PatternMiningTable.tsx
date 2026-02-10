@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import type { TableRow } from './types';
 import { LABEL_COLORS } from './constants';
 
@@ -17,7 +17,40 @@ export function PatternMiningTable({
     const [sortField, setSortField] = useState<SortField>('length');
     const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
     const [currentPage, setCurrentPage] = useState(1);
+    const [containerWidth, setContainerWidth] = useState(340);
     const itemsPerPage = 5;
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // 监听容器宽度变化
+    useEffect(() => {
+        if (!containerRef.current) return;
+
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setContainerWidth(entry.contentRect.width);
+            }
+        });
+
+        resizeObserver.observe(containerRef.current);
+        return () => resizeObserver.disconnect();
+    }, []);
+
+    // 根据容器宽度决定显示哪些列
+    const showLength = containerWidth >= 200;
+    const showCount = containerWidth >= 160;
+    const showAvgScore = containerWidth >= 260;
+
+    // 动态调整标签样式
+    const getTagClass = () => {
+        if (containerWidth < 280) {
+            return 'px-1 py-0.5 text-[10px] rounded';
+        } else if (containerWidth < 350) {
+            return 'px-1.5 py-0.5 text-xs rounded';
+        }
+        return 'px-2 py-0.5 text-xs rounded-full';
+    };
+
+    const showSequenceNumber = containerWidth >= 350;
 
     // 排序数据
     const sortedData = useMemo(() => {
@@ -76,109 +109,136 @@ export function PatternMiningTable({
     };
 
     return (
-        <div className="space-y-3">
+        <div ref={containerRef} className={`flex flex-col h-full ${containerWidth < 280 ? 'space-y-2' : 'space-y-3'}`}>
             {/* 表头 - 可点击排序 */}
-            <div className="grid grid-cols-[40px_1fr_50px_60px] gap-2 text-xs text-gray-500 font-medium px-2">
-                <button
-                    onClick={() => handleSort('length')}
-                    className="flex items-center gap-1 hover:text-orange-600 transition-colors cursor-pointer"
-                >
-                    Len <SortIcon field="length" />
-                </button>
-                <span>Pattern</span>
-                <button
-                    onClick={() => handleSort('count')}
-                    className="flex items-center gap-1 hover:text-orange-600 transition-colors cursor-pointer"
-                >
-                    Count <SortIcon field="count" />
-                </button>
-                <button
-                    onClick={() => handleSort('avgScore')}
-                    className="flex items-center gap-1 hover:text-orange-600 transition-colors cursor-pointer"
-                >
-                    Avg <SortIcon field="avgScore" />
-                </button>
+            <div className={`flex items-center ${containerWidth < 280 ? 'gap-1' : 'gap-2'} text-gray-500 font-medium px-2 flex-shrink-0 ${containerWidth < 300 ? 'text-[10px]' : 'text-xs'}`}>
+                {showLength && (
+                    <button
+                        onClick={() => handleSort('length')}
+                        className="flex items-center gap-1 hover:text-orange-600 transition-colors cursor-pointer flex-shrink-0"
+                    >
+                        <span className={containerWidth < 300 ? 'w-5' : ''}>Len</span>
+                        <SortIcon field="length" />
+                    </button>
+                )}
+                <span className="flex-1 min-w-0 truncate">Pattern</span>
+                {showCount && (
+                    <button
+                        onClick={() => handleSort('count')}
+                        className="flex items-center gap-1 hover:text-orange-600 transition-colors cursor-pointer flex-shrink-0"
+                    >
+                        <span className={containerWidth < 300 ? 'w-6 text-center' : ''}>Count</span>
+                        <SortIcon field="count" />
+                    </button>
+                )}
+                {showAvgScore && (
+                    <button
+                        onClick={() => handleSort('avgScore')}
+                        className="flex items-center gap-1 hover:text-orange-600 transition-colors cursor-pointer flex-shrink-0"
+                    >
+                        <span className={containerWidth < 300 ? 'w-6 text-center' : ''}>Avg</span>
+                        <SortIcon field="avgScore" />
+                    </button>
+                )}
             </div>
 
             {/* 数据列表 */}
-            <div className="space-y-2 h-[calc(100vh-320px)] overflow-y-auto pr-1">
+            <div className={`${containerWidth < 280 ? 'space-y-1' : 'space-y-2'} flex-1 overflow-y-auto pr-1 min-h-0`}>
                 {paginatedData.map((row, idx) => (
                     <div
                         key={idx}
                         onClick={() => onSelectPattern(row.pattern)}
                         className={`
-                            p-3 rounded-xl border cursor-pointer transition-all
+                            ${containerWidth < 280 ? 'p-1.5' : 'p-2'} rounded-xl border cursor-pointer transition-all
                             ${selectedPattern === row.pattern
                                 ? 'border-orange-400 bg-orange-50 shadow-sm'
                                 : 'border-gray-100 bg-white hover:border-gray-200'}
                         `}
                     >
-                        <div className="grid grid-cols-[40px_1fr_50px_60px] gap-2 items-center">
-                            <span className="text-sm text-gray-600">{row.length}</span>
-                            <div className="flex items-center flex-wrap gap-1">
+                        <div className={`flex items-center ${containerWidth < 280 ? 'gap-1' : 'gap-2'} min-w-0`}>
+                            {showLength && (
+                                <span className={`text-xs text-gray-600 flex-shrink-0 ${containerWidth < 300 ? 'w-5 text-center' : ''}`}>
+                                    {row.length}
+                                </span>
+                            )}
+                            <div className={`flex items-center flex-wrap gap-0.5 flex-1 min-w-0`}>
                                 {row.pattern.split(' → ').map((abbr, i) => (
                                     <span
                                         key={i}
-                                        className="px-2 py-0.5 rounded-full text-xs text-white font-medium"
+                                        className={`${getTagClass()} text-white font-medium flex-shrink-0`}
                                         style={{ backgroundColor: LABEL_COLORS[abbr] || '#999' }}
                                     >
-                                        {i + 1}.{abbr}
+                                        {showSequenceNumber ? `${i + 1}.${abbr}` : abbr}
                                     </span>
                                 ))}
                             </div>
-                            <span className="text-sm text-gray-600">{row.count}</span>
-                            <span className="text-sm text-gray-600">{row.avgScore.toFixed(3)}</span>
+                            {showCount && (
+                                <span className={`text-xs text-gray-600 flex-shrink-0 ${containerWidth < 300 ? 'w-6 text-center' : ''}`}>
+                                    {row.count}
+                                </span>
+                            )}
+                            {showAvgScore && (
+                                <span className={`text-xs text-gray-600 flex-shrink-0 ${containerWidth < 300 ? 'w-6 text-center' : ''}`}>
+                                    {row.avgScore.toFixed(3)}
+                                </span>
+                            )}
                         </div>
                     </div>
                 ))}
-            </div>
-
-            {/* 分页信息和控制 */}
-            <div className="space-y-2">
-                <div className="text-center text-xs text-gray-500">
-                    Page {currentPage} of {totalPages} ({sortedData.length} patterns)
-                </div>
-                <div className="flex justify-center gap-2 text-sm">
-                    <button
-                        onClick={goToFirstPage}
-                        disabled={currentPage === 1}
-                        className={`px-3 py-1 transition-colors ${currentPage === 1
-                                ? 'text-gray-300 cursor-not-allowed'
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
-                    >
-                        First
-                    </button>
-                    <button
-                        onClick={goToPrevPage}
-                        disabled={currentPage === 1}
-                        className={`px-3 py-1 transition-colors ${currentPage === 1
-                                ? 'text-gray-300 cursor-not-allowed'
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
-                    >
-                        Prev
-                    </button>
-                    <button
-                        onClick={goToNextPage}
-                        disabled={currentPage === totalPages}
-                        className={`px-3 py-1 transition-colors ${currentPage === totalPages
-                                ? 'text-gray-300 cursor-not-allowed'
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
-                    >
-                        Next
-                    </button>
-                    <button
-                        onClick={goToLastPage}
-                        disabled={currentPage === totalPages}
-                        className={`px-3 py-1 transition-colors ${currentPage === totalPages
-                                ? 'text-gray-300 cursor-not-allowed'
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
-                    >
-                        Last
-                    </button>
+                {/* 分页信息和控制 - 跟随在最后一条数据后 */}
+                <div className={`${containerWidth < 280 ? 'space-y-1' : 'space-y-2'} pt-1`}>
+                    <div className="text-center text-[10px] text-gray-500 truncate px-1">
+                        {containerWidth < 300
+                            ? `${currentPage}/${totalPages}`
+                            : `Page ${currentPage} of ${totalPages} (${sortedData.length})`
+                        }
+                    </div>
+                    <div className="flex justify-center gap-1 text-xs">
+                        <button
+                            onClick={goToFirstPage}
+                            disabled={currentPage === 1}
+                            className={`px-2 py-1 transition-colors ${currentPage === 1
+                                    ? 'text-gray-300 cursor-not-allowed'
+                                    : 'text-gray-600 hover:text-gray-800'
+                                }`}
+                            title="First"
+                        >
+                            |&lt;
+                        </button>
+                        <button
+                            onClick={goToPrevPage}
+                            disabled={currentPage === 1}
+                            className={`px-2 py-1 transition-colors ${currentPage === 1
+                                    ? 'text-gray-300 cursor-not-allowed'
+                                    : 'text-gray-600 hover:text-gray-800'
+                                }`}
+                            title="Previous"
+                        >
+                            &lt;
+                        </button>
+                        <button
+                            onClick={goToNextPage}
+                            disabled={currentPage === totalPages}
+                            className={`px-2 py-1 transition-colors ${currentPage === totalPages
+                                    ? 'text-gray-300 cursor-not-allowed'
+                                    : 'text-gray-600 hover:text-gray-800'
+                                }`}
+                            title="Next"
+                        >
+                            &gt;
+                        </button>
+                        <button
+                            onClick={goToLastPage}
+                            disabled={currentPage === totalPages}
+                            className={`px-2 py-1 transition-colors ${currentPage === totalPages
+                                    ? 'text-gray-300 cursor-not-allowed'
+                                    : 'text-gray-600 hover:text-gray-800'
+                                }`}
+                            title="Last"
+                        >
+                            &gt;|
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

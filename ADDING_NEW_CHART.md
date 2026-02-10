@@ -226,6 +226,156 @@ export const workRegistry: VisualizationWork[] = [
 - 将绘制逻辑分离到独立函数
 - 使用 TypeScript 类型定义数据结构
 
+### 大型组件模块化拆分
+
+当组件变得复杂（超过 500 行）时，建议将其拆分为多个模块化文件，以提高可维护性和代码清晰度。
+
+**推荐的文件结构：**
+
+```
+components/works/MyChart/
+  ├── index.tsx              # 主组件入口，组合所有模块
+  ├── types.ts               # TypeScript 接口和类型定义
+  ├── constants.ts           # 常量配置（颜色、尺寸、映射表等）
+  ├── utils.ts               # 纯函数工具集（数据处理、计算逻辑）
+  ├── SubComponent1.tsx      # 子组件1（如详情弹窗）
+  ├── SubComponent2.tsx      # 子组件2（如表格、图表等）
+  └── SubComponent3.tsx      # 子组件3（如可视化核心组件）
+```
+
+**拆分原则：**
+
+1. **types.ts - 类型定义**
+   - 所有 TypeScript 接口和类型别名
+   - 数据结构定义
+   - 组件 Props 类型
+   ```tsx
+   // types.ts
+   export interface DataItem {
+     id: string;
+     value: number;
+     label: string;
+   }
+   
+   export interface ChartConfig {
+     width: number;
+     height: number;
+     margin: { top: number; right: number; bottom: number; left: number };
+   }
+   ```
+
+2. **constants.ts - 常量配置**
+   - 颜色方案、尺寸常量
+   - 映射表、枚举值
+   - 配置对象
+   ```tsx
+   // constants.ts
+   export const COLORS = {
+     primary: '#3b82f6',
+     secondary: '#22d3ee',
+     accent: '#f59e0b',
+   };
+   
+   export const DEFAULT_CONFIG = {
+     animationDuration: 300,
+     nodeRadius: 5,
+     linkWidth: 2,
+   };
+   
+   export const LABEL_MAP = {
+     'A': 'Category A',
+     'B': 'Category B',
+   };
+   ```
+
+3. **utils.ts - 工具函数**
+   - 数据处理和转换函数
+   - 计算和算法逻辑
+   - 辅助函数（格式化、验证等）
+   - 保持纯函数，无副作用
+   ```tsx
+   // utils.ts
+   export function processData(rawData: RawData[]): ProcessedData[] {
+     return rawData.map(item => ({
+       ...item,
+       computed: calculateValue(item),
+     }));
+   }
+   
+   export function calculateMetrics(data: DataItem[]): Metrics {
+     // 复杂计算逻辑
+   }
+   
+   export function formatTime(timestamp: number): string {
+     // 时间格式化
+   }
+   ```
+
+4. **子组件文件 - 独立功能模块**
+   - 每个子组件一个文件
+   - 单一职责原则
+   - 独立的状态和逻辑
+   ```tsx
+   // PatternDetailModal.tsx
+   export function PatternDetailModal({ data, isOpen, onClose }) {
+     // 详情弹窗逻辑
+   }
+   
+   // DataTable.tsx
+   export function DataTable({ data, onSort, onFilter }) {
+     // 表格组件逻辑
+   }
+   
+   // Visualization.tsx
+   export function Visualization({ data, config }) {
+     // 核心可视化逻辑
+   }
+   ```
+
+5. **index.tsx - 主组件**
+   - 导入所有模块
+   - 组合子组件
+   - 管理全局状态
+   - 处理组件间通信
+   ```tsx
+   // index.tsx
+   import { DataItem, ChartConfig } from './types';
+   import { COLORS, DEFAULT_CONFIG } from './constants';
+   import { processData, calculateMetrics } from './utils';
+   import { PatternDetailModal } from './PatternDetailModal';
+   import { DataTable } from './DataTable';
+   import { Visualization } from './Visualization';
+   
+   export function MyChart() {
+     const [data, setData] = useState<DataItem[]>([]);
+     const [config, setConfig] = useState<ChartConfig>(DEFAULT_CONFIG);
+     
+     const processedData = useMemo(() => processData(data), [data]);
+     
+     return (
+       <div className="chart-container">
+         <Visualization data={processedData} config={config} />
+         <DataTable data={processedData} />
+         <PatternDetailModal data={selectedItem} />
+       </div>
+     );
+   }
+   ```
+
+**拆分的好处：**
+- ✓ 提高代码可读性和可维护性
+- ✓ 便于团队协作（不同人员修改不同文件）
+- ✓ 减少代码冲突
+- ✓ 便于单元测试
+- ✓ 支持按需导入，优化打包体积
+- ✓ 清晰的职责分离
+
+**实例参考：**
+- `components/works/TeachTree/` - 完整的模块化示例
+  - 从 1400+ 行单文件重构为 7 个模块化文件
+  - 清晰的类型定义、常量配置、工具函数分离
+  - 3 个独立子组件：PatternDetailModal、PatternMiningTable、InteractionTree
+
 ### 代码示例
 - `core`: 包含核心绘制/计算逻辑
 - `data`: 包含数据生成/处理逻辑

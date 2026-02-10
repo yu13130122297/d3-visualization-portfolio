@@ -21,7 +21,10 @@ export function InteractionTree({
     const svgRef = useRef<SVGSVGElement>(null);
     const mainGroupRef = useRef<any>(null);
     const zoomRef = useRef<any>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const fitToViewRef = useRef<(() => void) | null>(null);
     const [d3, setD3] = useState<any>(null);
+    const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
     useEffect(() => {
         import('d3').then((d3Module) => {
@@ -37,11 +40,14 @@ export function InteractionTree({
         const container = svgRef.current.parentElement;
         const width = container?.clientWidth || 1200;
         const height = container?.clientHeight || 800;
-        const padding = 60;
+        const padding = 40;
+
+        // 如果没有渲染的节点，返回默认缩放
+        const nodes = svg.selectAll('.node');
+        if (nodes.empty()) return;
 
         // 获取图表内容的边界
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        const nodes = svg.selectAll('.node');
         nodes.each(function (this: any, d: any) {
             const transform = d3.select(this).attr('transform');
             const match = /translate\(([^,]+),([^)]+)\)/.exec(transform);
@@ -63,16 +69,19 @@ export function InteractionTree({
         const scaleY = (height - padding * 2) / contentHeight;
         const scale = Math.min(scaleX, scaleY, 1);
 
-        // 计算居中平移
-        const contentCenterX = (minX + maxX) / 2;
-        const contentCenterY = (minY + maxY) / 2;
-        const translateX = width / 2 - contentCenterX * scale;
-        const translateY = height / 2 - contentCenterY * scale;
+        // 计算左上角对齐的平移
+        const translateX = padding - minX * scale;
+        const translateY = padding - minY * scale;
 
         // 应用变换
         const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
         svg.transition().duration(500).call(zoomRef.current.transform, transform);
     }, [treeData, d3]);
+
+    // 保持 fitToView 引用最新
+    useEffect(() => {
+        fitToViewRef.current = () => fitToView();
+    }, [fitToView]);
 
     useEffect(() => {
         if (!svgRef.current || !treeData || !d3) return;
@@ -391,11 +400,32 @@ export function InteractionTree({
     // 窗口大小变化时重新适配
     useEffect(() => {
         const handleResize = () => {
-            fitToView();
+            if (fitToViewRef.current) {
+                fitToViewRef.current();
+            }
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, [fitToView]);
+    }, []); // 不依赖任何外部函数
+
+    // 监听容器尺寸变化（拖拽调整宽度时触发）
+    useEffect(() => {
+        if (!containerRef.current) return;
+
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const { width, height } = entry.contentRect;
+                setContainerSize({ width, height });
+                // 容器尺寸变化后重新适配视图
+                if (fitToViewRef.current) {
+                    setTimeout(() => fitToViewRef.current!(), 50);
+                }
+            }
+        });
+
+        resizeObserver.observe(containerRef.current);
+        return () => resizeObserver.disconnect();
+    }, []); // 不依赖任何外部函数
 
     // 缩放控制函数
     const zoomIn = useCallback(() => {
@@ -415,9 +445,9 @@ export function InteractionTree({
     }, [fitToView]);
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 h-full relative overflow-hidden">
+        <div ref={containerRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 relative overflow-hidden flex flex-col min-h-[300px] lg:h-full">
             {/* 缩放控制按钮 */}
-            <div className="absolute top-4 right-4 flex gap-2 z-10">
+            <div className="absolute top-3 right-4 flex gap-2 z-10 flex-shrink-0">
                 <button
                     className="w-8 h-8 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center justify-center text-gray-700 font-medium"
                     onClick={zoomIn}
@@ -441,11 +471,11 @@ export function InteractionTree({
                 </button>
             </div>
 
-            <div className="absolute top-4 left-4 text-xs text-gray-400 z-10 bg-white/80 px-2 py-1 rounded">
+            <div className="absolute top-4 left-4 text-xs text-gray-400 z-10 bg-white/80 px-2 py-1 rounded flex-shrink-0">
                 滚轮缩放 · 拖拽平移 · 点击节点折叠
             </div>
 
-            <svg ref={svgRef} className="w-full h-full" style={{ minHeight: 400 }} />
+            <svg ref={svgRef} className="w-full flex-1 min-h-[250px]" />
         </div>
     );
 }

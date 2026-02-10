@@ -1,5 +1,6 @@
 import { HomeGallery } from "@/components/HomeGallery";
-import { Github, Twitter, Mail } from "lucide-react";
+import { Github, Twitter, Mail, FlaskConical } from "lucide-react";
+import Link from "next/link";
 
 export default function Page() {
   return (
@@ -50,6 +51,13 @@ export default function Page() {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href="/playground"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium"
+            >
+              <FlaskConical className="w-4 h-4" />
+              <span>实验台</span>
+            </Link>
             <a
               href="#"
               className="p-2 rounded-md text-muted-foreground hover:text-foreground transition-colors"
