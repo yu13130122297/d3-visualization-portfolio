@@ -11,12 +11,11 @@ import {
   Database,
   Wrench,
   Lightbulb,
-  Code2,
   FileText,
 } from "lucide-react";
 import type { VisualizationWork } from "@/types/work";
 import { categoryLabelsCN } from "@/types/work";
-import { CodeViewer } from "@/components/ui/CodeViewer";
+import { PromptViewer } from "@/components/ui/PromptViewer";
 import { cn } from "@/lib/utils";
 
 interface WorkDetailProps {
@@ -25,24 +24,30 @@ interface WorkDetailProps {
   next: VisualizationWork | null;
 }
 
+type RightPanelView = "info" | "prompt";
 
-type RightPanelView = "info" | "code";
+export type CanvasRatio = "fill" | "1:1" | "16:9" | "9:16" | "4:3" | "3:4";
+
+interface CanvasRatioOption {
+  label: string;
+  value: CanvasRatio;
+  width: number;
+  height: number;
+}
+
+const canvasRatioOptions: CanvasRatioOption[] = [
+  { label: "自适应", value: "fill", width: 100, height: 100 },
+  { label: "1:1", value: "1:1", width: 1, height: 1 },
+  { label: "16:9", value: "16:9", width: 16, height: 9 },
+  { label: "9:16", value: "9:16", width: 9, height: 16 },
+  { label: "4:3", value: "4:3", width: 4, height: 3 },
+  { label: "3:4", value: "3:4", width: 3, height: 4 },
+];
 
 export function WorkDetail({ work, prev, next }: WorkDetailProps) {
   const [fullscreen, setFullscreen] = useState(false);
   const [rightView, setRightView] = useState<RightPanelView>("info");
-  const codeTabs = [
-    { label: "核心代码", code: work.sourceCode.core },
-    ...(work.sourceCode.data
-      ? [{ label: "数据处理", code: work.sourceCode.data }]
-      : []),
-    ...(work.sourceCode.styles
-      ? [{ label: "样式/动画", code: work.sourceCode.styles }]
-      : []),
-    ...(work.sourceCode.full
-      ? [{ label: "完整源码", code: work.sourceCode.full }]
-      : []),
-  ];
+  const [canvasRatio, setCanvasRatio] = useState<CanvasRatio>("fill");
 
   if (fullscreen) {
     return (
@@ -104,8 +109,44 @@ export function WorkDetail({ work, prev, next }: WorkDetailProps) {
       <div className="flex-1 flex flex-col lg:flex-row">
         {/* Left: Visualization */}
         <div className="relative lg:flex-1 lg:min-w-0 bg-[hsl(var(--viz-bg))] border-b lg:border-b-0 lg:border-r border-border">
-          <div className="w-full h-[50vh] lg:h-[calc(100vh-49px)] lg:sticky lg:top-[49px]">
-            <work.component />
+          {/* Canvas Ratio Selector */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-background/80 backdrop-blur-sm border border-border rounded-lg p-1">
+            {canvasRatioOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setCanvasRatio(option.value)}
+                className={cn(
+                  "px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors",
+                  canvasRatio === option.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Canvas Container */}
+          <div className="w-full h-[50vh] lg:h-[calc(100vh-49px)] lg:sticky lg:top-[49px] flex items-center justify-center p-4">
+            <div
+              className={cn(
+                "relative bg-background/50 border border-border/50 rounded-lg overflow-hidden shadow-sm transition-all duration-300",
+                canvasRatio === "fill" ? "w-full h-full" : "max-w-full max-h-full"
+              )}
+              style={
+                canvasRatio === "fill"
+                  ? {}
+                  : {
+                      aspectRatio: `${canvasRatioOptions.find((o) => o.value === canvasRatio)!.width} / ${canvasRatioOptions.find((o) => o.value === canvasRatio)!.height}`,
+                      maxHeight: "calc(100vh - 80px)",
+                      maxWidth: "calc(100% - 32px)",
+                    }
+              }
+            >
+              <work.component />
+            </div>
           </div>
           <button
             type="button"
@@ -145,17 +186,17 @@ export function WorkDetail({ work, prev, next }: WorkDetailProps) {
             </button>
             <button
               type="button"
-              onClick={() => setRightView("code")}
+              onClick={() => setRightView("prompt")}
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative",
-                rightView === "code"
+                rightView === "prompt"
                   ? "text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Code2 className="w-4 h-4" />
-              {"源代码"}
-              {rightView === "code" && (
+              <FileText className="w-4 h-4" />
+              {"提示词"}
+              {rightView === "prompt" && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
               )}
             </button>
@@ -236,19 +277,19 @@ export function WorkDetail({ work, prev, next }: WorkDetailProps) {
                   </div>
                 )}
 
-                {/* Quick nav to code */}
+                {/* Quick nav to prompt */}
                 <button
                   type="button"
-                  onClick={() => setRightView("code")}
+                  onClick={() => setRightView("prompt")}
                   className="mt-8 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-secondary text-sm font-medium text-foreground hover:bg-secondary/80 transition-colors"
                 >
-                  <Code2 className="w-4 h-4" />
-                  {"查看源代码"}
+                  <FileText className="w-4 h-4" />
+                  {"查看提示词"}
                 </button>
               </div>
             ) : (
               <div className="p-4">
-                <CodeViewer tabs={codeTabs} filename={`${work.id}.ts`} />
+                <PromptViewer prompt={work.prompt} filename={`${work.id}-prompt.md`} />
               </div>
             )}
           </div>

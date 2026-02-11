@@ -17,12 +17,7 @@ export interface VisualizationWork {
   tags: string[];
   component: React.ComponentType;
 
-  sourceCode: {
-    core: string;
-    data?: string;
-    styles?: string;
-    full?: string;
-  };
+  prompt: string;
 
   metadata?: {
     dataSource?: string;

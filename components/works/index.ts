@@ -1,3 +1,4 @@
-export { ForceGraph, forceGraphCode } from "./ForceGraph";
-export { StreamGraph, streamGraphCode } from "./StreamGraph";
-export { TeachTree, teachTreeCode } from "./TeachTree";
+export { ForceGraph, forceGraphPrompt } from "./ForceGraph";
+export { StreamGraph, streamGraphPrompt } from "./StreamGraph";
+export { TeachTree, teachTreePrompt } from "./TeachTree";
+export { RingChart, ringChartPrompt } from "./RingChart";

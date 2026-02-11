@@ -13,27 +13,27 @@ import { workRegistry } from "@/registry/workRegistry";
 export default function PlaygroundPage() {
   const STORAGE_KEY = 'playground-selected-works';
 
-  const [selectedWorks, setSelectedWorks] = useState<VisualizationWork[]>([]);
+  const [selectedWorks, setSelectedWorks] = useState<VisualizationWork[]>(() => {
+    // 在初始化时就尝试从 localStorage 加载
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedIds = localStorage.getItem(STORAGE_KEY);
+        if (cachedIds) {
+          const ids = JSON.parse(cachedIds);
+          const works = ids.map((id: string) => workRegistry.find(w => w.id === id)).filter(Boolean) as VisualizationWork[];
+          return works;
+        }
+      } catch {
+        // 忽略存储错误
+      }
+    }
+    return [];
+  });
   const [preventCollision, setPreventCollision] = useState(true);
   const saveRef = useRef<(() => void) | null>(null);
   const [saveMessage, setSaveMessage] = useState("");
 
-  // 在客户端挂载后从缓存加载
-  useEffect(() => {
-    try {
-      const cachedIds = localStorage.getItem(STORAGE_KEY);
-      if (cachedIds) {
-        const ids = JSON.parse(cachedIds);
-        // 从 workRegistry 中重建完整的 work 对象
-        const works = ids.map((id: string) => workRegistry.find(w => w.id === id)).filter(Boolean) as VisualizationWork[];
-        setSelectedWorks(works);
-      }
-    } catch {
-      // 忽略存储错误
-    }
-  }, []);
-
-  // 保存已添加的组件 ID 列表
+  // 保存已添加的组件 ID 列表（每次 selectedWorks 变化时自动保存）
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {

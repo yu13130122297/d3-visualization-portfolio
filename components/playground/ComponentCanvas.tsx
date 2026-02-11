@@ -51,10 +51,15 @@ const saveCachedStates = (states: ComponentState[]): void => {
 };
 
 export function ComponentCanvas({ works, onRemoveWork, preventCollision, saveRef }: ComponentCanvasProps) {
+  const initialCachedStates = useRef<ComponentState[] | null>(null);
+
+  // 只在第一次获取缓存
+  if (initialCachedStates.current === null) {
+    initialCachedStates.current = loadCachedStates();
+  }
+
   const [componentStates, setComponentStates] = useState<ComponentState[]>(() => {
-    // 初始化时尝试从缓存加载
-    const cached = loadCachedStates();
-    return cached || [];
+    return initialCachedStates.current || [];
   });
   const setComponentStatesRef = useRef(setComponentStates);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -167,21 +172,32 @@ export function ComponentCanvas({ works, onRemoveWork, preventCollision, saveRef
 
   // 初始化组件位置（网格布局）
   useEffect(() => {
-    const currentIds = works.map(w => w.id);
-    const existingIds = componentStates.map(s => s.id);
+    setComponentStates(prev => {
+      const currentIds = works.map(w => w.id);
+      const existingIds = prev.map(s => s.id);
 
-    // 移除不在当前 works 中的组件状态
-    // 为新组件添加默认状态
-    const newWorks = works.filter(w => !existingIds.includes(w.id));
+      // 找出新增的组件
+      const newWorks = works.filter(w => !existingIds.includes(w.id));
 
-    // 如果需要清理或添加新组件
-    if (newWorks.length > 0 || componentStates.some(s => !currentIds.includes(s.id))) {
-      setComponentStates(prev => {
-        // 只保留当前存在的组件状态
-        const validStates = prev.filter(s => currentIds.includes(s.id));
+      // 如果没有新组件且没有需要删除的组件，直接返回
+      if (newWorks.length === 0 && !prev.some(s => !currentIds.includes(s.id))) {
+        return prev;
+      }
 
-        const gridColumns = 2;
-        const newStates = newWorks.map((work, idx) => ({
+      // 只保留当前存在的组件状态，保持它们的位置不变
+      const validStates = prev.filter(s => currentIds.includes(s.id));
+
+      // 只为真正新增的组件分配网格位置
+      const gridColumns = 2;
+      const newStates = newWorks.map((work, idx) => {
+        // 检查缓存中是否有这个组件的状态
+        const cachedState = initialCachedStates.current?.find(s => s.id === work.id);
+        if (cachedState) {
+          // 如果缓存中有，使用缓存的位置
+          return cachedState;
+        }
+        // 否则分配新的网格位置
+        return {
           id: work.id,
           x: (validStates.length + idx) % gridColumns * (DEFAULT_SIZE.width + 20) + 20,
           y: Math.floor((validStates.length + idx) / gridColumns) * (DEFAULT_SIZE.height + 120) + 20,
@@ -189,10 +205,11 @@ export function ComponentCanvas({ works, onRemoveWork, preventCollision, saveRef
           height: DEFAULT_SIZE.height,
           isMinimized: false,
           isLocked: false,
-        }));
-        return [...validStates, ...newStates];
+        };
       });
-    }
+
+      return [...validStates, ...newStates];
+    });
   }, [works]);
 
   const handleMouseDown = (e: React.MouseEvent, id: string) => {
@@ -453,9 +470,8 @@ export function ComponentCanvas({ works, onRemoveWork, preventCollision, saveRef
           return (
             <div
               key={work.id}
-              className={`absolute bg-background border overflow-hidden shadow-sm ${
-                isActive ? "ring-2 ring-primary z-50" : "z-10"
-              } ${state.isLocked ? "border-primary/50" : ""}`}
+              className={`absolute bg-background border overflow-hidden shadow-sm ${isActive ? "ring-2 ring-primary z-50" : "z-10"
+                } ${state.isLocked ? "border-primary/50" : ""}`}
               style={{
                 left: state.x,
                 top: state.y,
@@ -467,9 +483,8 @@ export function ComponentCanvas({ works, onRemoveWork, preventCollision, saveRef
             >
               {/* Header */}
               <div
-                className={`flex items-center gap-2 px-3 py-2 border-b border-border bg-muted/30 select-none ${
-                  state.isLocked ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing"
-                }`}
+                className={`flex items-center gap-2 px-3 py-2 border-b border-border bg-muted/30 select-none ${state.isLocked ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing"
+                  }`}
                 onMouseDown={(e) => !state.isLocked && handleMouseDown(e, work.id)}
               >
                 <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -483,11 +498,10 @@ export function ComponentCanvas({ works, onRemoveWork, preventCollision, saveRef
                 </div>
                 <button
                   onClick={() => handleToggleLock(work.id)}
-                  className={`p-1 rounded transition-colors flex-shrink-0 ${
-                    state.isLocked
+                  className={`p-1 rounded transition-colors flex-shrink-0 ${state.isLocked
                       ? "text-primary bg-primary/10"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
+                    }`}
                   aria-label={state.isLocked ? "解锁" : "锁定"}
                 >
                   {state.isLocked ? (

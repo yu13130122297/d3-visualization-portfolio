@@ -308,15 +308,109 @@ export function StreamGraph() {
     );
 }
 
-export const streamGraphCode = {
-    core: `// Stream Graph Core Rendering
-// Stacked area chart with wiggle offset (stream layout)
+// --- Prompt for recreating this Stream Graph visualization ---
+// 请将以下提示词发送给 Cursor 或其他 AI 工具来复现此可视化图表
 
+export const streamGraphPrompt = `# 编程语言趋势流图 - 堆叠面积时间序列可视化
+
+请创建一个流图（Stream Graph）组件，使用纯 TypeScript 和 Canvas 2D API 实现堆叠面积图的时间序列可视化。
+
+## 一、功能概述
+- 7 层堆叠面积图，展示 2018-2025 年编程语言趋势
+- 流布局（以中心线为基线对称排列）
+- 入场动画：从左到右平滑展开
+- 悬停交互：高亮当前层，显示悬停提示框
+- 垂直辅助线（十字线）
+- 响应式画布
+
+## 二、数据结构
+
+### 数据点接口
+\`\`\`typescript
+interface DataPoint {
+  date: number;       // 年份（2018-2025）
+  values: number[];   // 各层对应值
+}
+\`\`\`
+
+## 三、颜色配置
+\`\`\`typescript
+const streamColors = [
+  "#3b82f6",  // 蓝色
+  "#22d3ee",  // 青色
+  "#a78bfa",  // 紫色
+  "#f472b6",  // 粉色
+  "#34d399",  // 绿色
+  "#fbbf24",  // 黄色
+  "#f97316",  // 橙色
+];
+\`\`\`
+
+## 四、数据生成函数
+使用多重正弦波叠加生成有机流动的曲线：
+
+\`\`\`typescript
+function generateStreamData(
+  layers: number,
+  points: number
+): { data: DataPoint[]; labels: string[] } {
+  const labels = [
+    "TypeScript",
+    "Python",
+    "Rust",
+    "Go",
+    "JavaScript",
+    "Java",
+    "C++",
+  ].slice(0, layers);
+
+  const data: DataPoint[] = [];
+  const baseAmplitudes = labels.map(() => 20 + Math.random() * 40);
+  const phases = labels.map(() => Math.random() * Math.PI * 2);
+
+  for (let i = 0; i < points; i++) {
+    const t = i / (points - 1);
+    const values = labels.map((_, li) => {
+      // 叠加多个正弦波，产生自然的波动效果
+      const wave1 = Math.sin(t * Math.PI * 2 + phases[li]) * baseAmplitudes[li] * 0.5;
+      const wave2 = Math.sin(t * Math.PI * 4 + phases[li] * 2) * baseAmplitudes[li] * 0.25;
+      const trend = Math.sin(t * Math.PI) * baseAmplitudes[li] * 0.3;
+      return Math.max(2, baseAmplitudes[li] + wave1 + wave2 + trend);
+    });
+    data.push({ date: 2018 + t * 7, values });
+  }
+
+  return { data, labels };
+}
+\`\`\`
+
+## 五、核心绘制函数
+
+### 堆叠位置计算（Wiggle 布局）
+\`\`\`typescript
 function draw() {
   const { data, labels } = dataRef.current;
   const layers = labels.length;
 
-  // Compute stacked positions (wiggle baseline)
+  // 入场动画进度
+  progressRef.current = Math.min(1, progressRef.current + 0.015);
+  const progress = progressRef.current;
+  const easedProgress = 1 - Math.pow(1 - progress, 3);
+  const visiblePoints = Math.ceil(data.length * easedProgress);
+
+  const margin = { top: 40, right: 20, bottom: 40, left: 20 };
+  const innerW = w - margin.left - margin.right;
+  const innerH = h - margin.top - margin.bottom;
+
+  // 计算堆叠位置（以中心为基线）
+  const stackedTop: number[][] = [];
+  const stackedBottom: number[][] = [];
+
+  for (let li = 0; li < layers; li++) {
+    stackedTop.push([]);
+    stackedBottom.push([]);
+  }
+
   for (let i = 0; i < visiblePoints; i++) {
     const point = data[i];
     const total = point.values.reduce((a, b) => a + b, 0);
@@ -332,71 +426,56 @@ function draw() {
     }
   }
 
-  // Draw each stream layer as filled path
+  // 绘制每一层
   for (let li = 0; li < layers; li++) {
+    const isHovered = hoveredLayer === li;
+    const dimmed = hoveredLayer >= 0 && !isHovered;
+    const color = streamColors[li % streamColors.length];
+
     ctx.beginPath();
-    // Top edge (left to right)
+    // 上边缘（从左到右）
     for (let i = 0; i < visiblePoints; i++) {
       const x = margin.left + (i / (data.length - 1)) * innerW;
       if (i === 0) ctx.moveTo(x, stackedTop[li][i]);
       else ctx.lineTo(x, stackedTop[li][i]);
     }
-    // Bottom edge (right to left)
+    // 下边缘（从右到左）
     for (let i = visiblePoints - 1; i >= 0; i--) {
       const x = margin.left + (i / (data.length - 1)) * innerW;
       ctx.lineTo(x, stackedBottom[li][i]);
     }
     ctx.closePath();
-    ctx.globalAlpha = hoveredLayer === li ? 1 : 0.75;
-    ctx.fillStyle = streamColors[li];
+
+    ctx.globalAlpha = dimmed ? 0.15 : isHovered ? 1 : 0.75;
+    ctx.fillStyle = color;
     ctx.fill();
+
+    if (isHovered) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+    }
   }
-}`,
-    data: `// Stream Data Generation
-interface DataPoint {
-  date: number;
-  values: number[];
 }
+\`\`\`
 
-function generateStreamData(layers: number, points: number) {
-  const labels = [
-    "TypeScript", "Python", "Rust", "Go",
-    "JavaScript", "Java", "C++"
-  ].slice(0, layers);
+## 六、悬停检测
 
-  const data: DataPoint[] = [];
-  const baseAmplitudes = labels.map(() => 20 + Math.random() * 40);
-  const phases = labels.map(() => Math.random() * Math.PI * 2);
+### 获取鼠标位置对应的层
+\`\`\`typescript
+const getLayerAt = (x: number, y: number): number => {
+  const { data } = dataRef.current;
+  const margin = { top: 40, right: 20, bottom: 40, left: 20 };
+  const innerW = w - margin.left - margin.right;
+  const innerH = h - margin.top - margin.bottom;
 
-  for (let i = 0; i < points; i++) {
-    const t = i / (points - 1);
-    const values = labels.map((_, li) => {
-      // Combine multiple sine waves for organic appearance
-      const wave1 = Math.sin(t * Math.PI * 2 + phases[li])
-                     * baseAmplitudes[li] * 0.5;
-      const wave2 = Math.sin(t * Math.PI * 4 + phases[li] * 2)
-                     * baseAmplitudes[li] * 0.25;
-      const trend = Math.sin(t * Math.PI) * baseAmplitudes[li] * 0.3;
-      return Math.max(2, baseAmplitudes[li] + wave1 + wave2 + trend);
-    });
-    data.push({ date: 2018 + t * 7, values });
-  }
-
-  return { data, labels };
-}`,
-    styles: `// Hover & Tooltip Interaction
-const streamColors = [
-  "#3b82f6", "#22d3ee", "#a78bfa",
-  "#f472b6", "#34d399", "#fbbf24", "#f97316"
-];
-
-// Layer detection from mouse position
-function getLayerAt(x: number, y: number): number {
   const xIdx = Math.round(((x - margin.left) / innerW) * (data.length - 1));
   if (xIdx < 0 || xIdx >= data.length) return -1;
 
   const point = data[xIdx];
   const total = point.values.reduce((a, b) => a + b, 0);
+  const centerY = margin.top + innerH / 2;
   const scale = innerH / (total * 1.2);
   let currentY = centerY - (total * scale) / 2;
 
@@ -406,37 +485,163 @@ function getLayerAt(x: number, y: number): number {
     currentY += layerH;
   }
   return -1;
-}
-
-// Tooltip rendering
-if (hoveredLayer >= 0) {
-  // Vertical crosshair line
-  ctx.setLineDash([3, 3]);
-  ctx.strokeStyle = "rgba(255,255,255,0.2)";
-  ctx.beginPath();
-  ctx.moveTo(mouseX, margin.top);
-  ctx.lineTo(mouseX, h - margin.bottom);
-  ctx.stroke();
-
-  // Info box
-  ctx.fillStyle = "rgba(0,0,0,0.9)";
-  ctx.roundRect(tx, ty, boxW, 42, 6);
-  ctx.fill();
-
-  // Color indicator + label + value
-  ctx.fillStyle = streamColors[hoveredLayer];
-  ctx.arc(tx + 10, ty + 15, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillText(label, tx + 20, ty + 18);
-  ctx.fillText(year + " : " + value, tx + 20, ty + 34);
-}`,
-    full: `"use client";
-
-import { useEffect, useRef, useCallback } from "react";
-
-// Full component source - see StreamGraph/index.tsx
-// Contains: data generation with sine wave composition,
-// stacked area rendering, hover layer detection,
-// tooltip display, and entrance animation.
-// ~220 lines of TypeScript + Canvas2D code.`,
 };
+\`\`\`
+
+## 七、悬停提示框（Tooltip）
+
+\`\`\`typescript
+// Tooltip 渲染
+if (hoveredLayer >= 0 && mouseX >= margin.left && mouseX <= w - margin.right) {
+  const xIdx = Math.round(((mouseX - margin.left) / innerW) * (data.length - 1));
+  if (xIdx >= 0 && xIdx < data.length) {
+    const point = data[xIdx];
+    const val = point.values[hoveredLayer];
+    const label = labels[hoveredLayer];
+    const year = point.date.toFixed(1);
+    const tooltipY = (stackedTop[hoveredLayer][xIdx] + stackedBottom[hoveredLayer][xIdx]) / 2;
+
+    // 垂直辅助线
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mouseX, margin.top);
+    ctx.lineTo(mouseX, h - margin.bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Tooltip 框
+    const text1 = label;
+    const text2 = \`\${year} : \${val.toFixed(1)}\`;
+    ctx.font = "bold 12px Inter, system-ui, sans-serif";
+    const tw1 = ctx.measureText(text1).width;
+    ctx.font = "11px Inter, system-ui, sans-serif";
+    const tw2 = ctx.measureText(text2).width;
+    const boxW = Math.max(tw1, tw2) + 20;
+    let tx = mouseX + 15;
+    let ty = tooltipY - 25;
+    // 边界检测，防止超出画布
+    if (tx + boxW > w - 10) tx = mouseX - boxW - 15;
+    if (ty < 10) ty = 10;
+
+    ctx.fillStyle = "rgba(0,0,0,0.9)";
+    ctx.beginPath();
+    ctx.roundRect(tx, ty, boxW, 42, 6);
+    ctx.fill();
+
+    // 颜色指示点
+    ctx.fillStyle = streamColors[hoveredLayer % streamColors.length];
+    ctx.beginPath();
+    ctx.arc(tx + 10, ty + 15, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 文字
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 12px Inter, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(text1, tx + 20, ty + 18);
+    ctx.fillStyle = "#aaa";
+    ctx.font = "11px Inter, system-ui, sans-serif";
+    ctx.fillText(text2, tx + 20, ty + 34);
+  }
+}
+\`\`\`
+
+## 八、坐标轴标签
+
+\`\`\`typescript
+// X 轴年份标签
+ctx.fillStyle = "rgba(160,160,160,0.6)";
+ctx.font = "11px Inter, system-ui, sans-serif";
+ctx.textAlign = "center";
+const years = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
+for (const yr of years) {
+  const t = (yr - 2018) / 7;
+  const x = margin.left + t * innerW;
+  if (x >= margin.left && x <= w - margin.right) {
+    ctx.fillText(yr.toString(), x, h - margin.bottom + 20);
+  }
+}
+\`\`\`
+
+## 九、交互事件
+
+\`\`\`typescript
+const onMouseMove = (e: MouseEvent) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  mouseXRef.current = x;
+  hoveredLayerRef.current = getLayerAt(x, y);
+  canvas.style.cursor = hoveredLayerRef.current >= 0 ? "pointer" : "default";
+  cancelAnimationFrame(animationRef.current);
+  animationRef.current = requestAnimationFrame(draw);
+};
+
+const onMouseLeave = () => {
+  hoveredLayerRef.current = -1;
+  mouseXRef.current = -1;
+  cancelAnimationFrame(animationRef.current);
+  animationRef.current = requestAnimationFrame(draw);
+};
+\`\`\`
+
+## 十、响应式处理
+
+\`\`\`typescript
+const resize = () => {
+  const rect = container.getBoundingClientRect();
+  sizeRef.current = { width: rect.width, height: rect.height };
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = \`\${rect.width}px\`;
+  canvas.style.height = \`\${rect.height}px\`;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+};
+
+window.addEventListener("resize", () => {
+  resize();
+  cancelAnimationFrame(animationRef.current);
+  animationRef.current = requestAnimationFrame(draw);
+});
+\`\`\`
+
+## 十一、使用 React Hooks
+
+\`\`\`typescript
+export function StreamGraph() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number>(0);
+  const dataRef = useRef<ReturnType<typeof generateStreamData> | null>(null);
+  const hoveredLayerRef = useRef<number>(-1);
+  const mouseXRef = useRef<number>(-1);
+  const sizeRef = useRef({ width: 0, height: 0 });
+  const progressRef = useRef(0);
+
+  const getLayerAt = useCallback((x: number, y: number): number => {
+    // ...实现
+  }, []);
+
+  // 组件返回
+  return (
+    <div ref={containerRef} className="w-full h-full" style={{ minHeight: 400 }}>
+      <canvas ref={canvasRef} className="block w-full h-full" />
+    </div>
+  );
+}
+\`\`\`
+
+---
+
+技术要点：
+1. 使用多重正弦波叠加生成有机流动的曲线
+2. Wiggle 布局：以中心线为基线，上下对称排列
+3. 使用 requestAnimationFrame 实现流畅的入场动画
+4. 三次缓动函数（cubic ease-out）让动画更自然
+5. Canvas 路径绘制：从左到右绘制上边缘，从右到左绘制下边缘，闭合路径
+6. 悬停检测：根据 Y 坐标判断鼠标落在哪一层
+7. Tooltip 智能定位：边界检测防止超出画布
+`;
+

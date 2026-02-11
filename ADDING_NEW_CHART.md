@@ -216,6 +216,258 @@ export const workRegistry: VisualizationWork[] = [
 - 使用 `useCallback` 和 `useMemo` 优化性能
 - Canvas 图表考虑离屏渲染
 
+### 图表比例自适应
+
+所有图表组件必须支持以下比例自适应：**1:1、16:9、9:16、3:4、4:3**，以及任意屏幕尺寸自适应。
+
+#### 基础实现模式
+
+使用 `ResizeObserver` 监听容器尺寸变化，并根据当前容器的宽高比动态计算图表绘制区域：
+
+```tsx
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+// 支持的目标比例
+type AspectRatio = "1:1" | "16:9" | "9:16" | "3:4" | "4:3" | "auto";
+
+// 比例计算辅助函数
+function getAspectRatioValue(ratio: AspectRatio): number {
+  const ratioMap: Record<AspectRatio, number> = {
+    "1:1": 1,
+    "16:9": 16 / 9,
+    "9:16": 9 / 16,
+    "3:4": 3 / 4,
+    "4:3": 4 / 3,
+    "auto": 0, // 表示自动适应
+  };
+  return ratioMap[ratio];
+}
+
+// 计算适应容器后的绘制区域尺寸
+function calculateDrawArea(
+  containerWidth: number,
+  containerHeight: number,
+  targetRatio: AspectRatio,
+  padding = 16
+): { width: number; height: number; offsetX: number; offsetY: number } {
+  const effectiveWidth = containerWidth - padding * 2;
+  const effectiveHeight = containerHeight - padding * 2;
+
+  if (targetRatio === "auto") {
+    // 自动适应：填充整个容器
+    return {
+      width: effectiveWidth,
+      height: effectiveHeight,
+      offsetX: padding,
+      offsetY: padding,
+    };
+  }
+
+  const targetRatioValue = getAspectRatioValue(targetRatio);
+  const containerRatio = effectiveWidth / effectiveHeight;
+
+  let drawWidth: number;
+  let drawHeight: number;
+
+  if (containerRatio > targetRatioValue) {
+    // 容器比目标更宽，以高度为基准
+    drawHeight = effectiveHeight;
+    drawWidth = drawHeight * targetRatioValue;
+  } else {
+    // 容器比目标更窄，以宽度为基准
+    drawWidth = effectiveWidth;
+    drawHeight = drawWidth / targetRatioValue;
+  }
+
+  // 居中偏移
+  const offsetX = (containerWidth - drawWidth) / 2;
+  const offsetY = (containerHeight - drawHeight) / 2;
+
+  return { width: drawWidth, height: drawHeight, offsetX, offsetY };
+}
+
+export function MyChart() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
+
+  // 监听容器尺寸变化
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setContainerSize({ width, height });
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // 图表绘制逻辑
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || containerSize.width === 0 || containerSize.height === 0) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // 计算绘制区域
+    const drawArea = calculateDrawArea(
+      containerSize.width,
+      containerSize.height,
+      aspectRatio
+    );
+
+    // 设置 Canvas 尺寸
+    canvas.width = drawArea.width;
+    canvas.height = drawArea.height;
+
+    // 清空画布
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 绘制图表内容（使用 drawArea.width 和 drawArea.height）
+    drawChart(ctx, drawArea.width, drawArea.height);
+  }, [containerSize, aspectRatio]);
+
+  return (
+    <div className="w-full h-full bg-white">
+      {/* 比例切换器 */}
+      <div className="flex gap-2 p-2 border-b">
+        {(["1:1", "16:9", "9:16", "3:4", "4:3", "auto"] as AspectRatio[]).map((ratio) => (
+          <button
+            key={ratio}
+            onClick={() => setAspectRatio(ratio)}
+            className={`px-3 py-1 rounded text-sm transition-colors ${
+              aspectRatio === ratio
+                ? "bg-blue-500 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            {ratio}
+          </button>
+        ))}
+      </div>
+
+      {/* 图表容器 */}
+      <div ref={containerRef} className="w-full h-full p-4">
+        <canvas
+          ref={canvasRef}
+          className="mx-auto"
+          style={{
+            width: `${calculateDrawArea(containerSize.width, containerSize.height, aspectRatio).width}px`,
+            height: `${calculateDrawArea(containerSize.width, containerSize.height, aspectRatio).height}px`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function drawChart(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  // 你的图表绘制逻辑
+  // 使用 width 和 height 作为绘制边界
+}
+```
+
+#### SVG 版本
+
+对于 SVG 图表，使用 `viewBox` 实现自适应：
+
+```tsx
+export function MySVGChart() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setContainerSize({ width, height });
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  const drawArea = calculateDrawArea(
+    containerSize.width,
+    containerSize.height,
+    aspectRatio
+  );
+
+  return (
+    <div className="w-full h-full bg-white">
+      {/* 比例切换器 */}
+      <div className="flex gap-2 p-2 border-b">
+        {(["1:1", "16:9", "9:16", "3:4", "4:3", "auto"] as AspectRatio[]).map((ratio) => (
+          <button
+            key={ratio}
+            onClick={() => setAspectRatio(ratio)}
+            className={`px-3 py-1 rounded text-sm transition-colors ${
+              aspectRatio === ratio
+                ? "bg-blue-500 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            {ratio}
+          </button>
+        ))}
+      </div>
+
+      {/* 图表容器 */}
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center p-4">
+        <svg
+          width={drawArea.width}
+          height={drawArea.height}
+          viewBox={`0 0 ${drawArea.width} ${drawArea.height}`}
+        >
+          {/* SVG 绘制内容 */}
+          <circle cx={drawArea.width / 2} cy={drawArea.height / 2} r={Math.min(drawArea.width, drawArea.height) * 0.4} />
+        </svg>
+      </div>
+    </div>
+  );
+}
+```
+
+#### 实现要点
+
+1. **容器监听**：始终使用 `ResizeObserver` 监听容器尺寸变化
+2. **比例计算**：根据容器宽高比和目标比例计算绘制区域
+3. **居中显示**：绘制区域在容器中居中，保持两侧留白
+4. **状态管理**：使用状态管理当前选择的比例
+5. **即时响应**：容器尺寸或比例变化时，立即重新绘制
+
+#### 测试要求
+
+在以下场景下测试图表是否正常显示：
+
+| 比例 | 测试容器尺寸 | 预期行为 |
+|------|------------|---------|
+| 1:1 | 800x600 | 正方形居中，左右有留白 |
+| 16:9 | 800x600 | 宽矩形，占满宽度 |
+| 9:16 | 800x600 | 高矩形，占满高度 |
+| 3:4 | 800x600 | 较高矩形，占满高度 |
+| 4:3 | 800x600 | 较宽矩形，占满宽度 |
+| auto | 任意尺寸 | 填充整个容器 |
+| 所有比例 | 移动端 | 正确响应触摸操作 |
+
 ### 响应式设计
 - 监听窗口大小变化
 - 根据容器尺寸调整图表大小

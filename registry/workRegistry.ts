@@ -1,7 +1,8 @@
 import type { VisualizationWork } from "@/types/work";
-import { ForceGraph, forceGraphCode } from "@/components/works/ForceGraph";
-import { StreamGraph, streamGraphCode } from "@/components/works/StreamGraph";
-import { TeachTree, teachTreeCode } from "@/components/works/TeachTree";
+import { ForceGraph, forceGraphPrompt } from "@/components/works/ForceGraph";
+import { StreamGraph, streamGraphPrompt } from "@/components/works/StreamGraph";
+import { TeachTree, teachTreePrompt } from "@/components/works/TeachTree";
+import { RingChart, ringChartPrompt } from "@/components/works/RingChart";
 
 export const workRegistry: VisualizationWork[] = [
   {
@@ -15,12 +16,7 @@ export const workRegistry: VisualizationWork[] = [
     category: "network",
     tags: ["Canvas", "Force Layout", "Physics Simulation", "Interactive"],
     component: ForceGraph,
-    sourceCode: {
-      core: forceGraphCode.core,
-      data: forceGraphCode.data,
-      styles: forceGraphCode.styles,
-      full: forceGraphCode.full,
-    },
+    prompt: forceGraphPrompt,
     metadata: {
       dataSource: "程序化生成的网络数据",
       tools: ["Canvas2D", "自定义力引擎"],
@@ -40,12 +36,7 @@ export const workRegistry: VisualizationWork[] = [
     category: "timeline",
     tags: ["Canvas", "Stream Graph", "Time Series", "Animation"],
     component: StreamGraph,
-    sourceCode: {
-      core: streamGraphCode.core,
-      data: streamGraphCode.data,
-      styles: streamGraphCode.styles,
-      full: streamGraphCode.full,
-    },
+    prompt: streamGraphPrompt,
     metadata: {
       dataSource: "模拟趋势数据（正弦波合成）",
       tools: ["Canvas2D", "自定义堆叠算法"],
@@ -65,18 +56,33 @@ export const workRegistry: VisualizationWork[] = [
     category: "network",
     tags: ["D3.js", "Pattern Mining", "Hierarchical Data", "Interactive"],
     component: TeachTree,
-    sourceCode: {
-      core: teachTreeCode.core,
-      data: teachTreeCode.data,
-      styles: teachTreeCode.styles,
-      full: teachTreeCode.full,
-    },
+    prompt: teachTreePrompt,
     metadata: {
       dataSource: "课堂实录 JSONL 数据",
       tools: ["D3.js", "N-gram 算法", "树形布局"],
       createdAt: "2024-06-01",
       inspiration:
         "基于课堂行为分析研究，将文本化的课堂实录转换为可视化的行为模式图谱。",
+    },
+  },
+  {
+    id: "ring-chart",
+    title: "教学阶段玫瑰图",
+    subtitle: "课堂教学四阶段交互行为可视化",
+    description:
+      "一个环形玫瑰图系统，展示课堂教学的四个阶段（旧知回顾、新知探究、知识应用、课堂总结）中各类教学行为的持续时间和分布情况。",
+    fullDescription:
+      "该玫瑰图将整堂课按时间顺序划分为四个教学阶段，每个阶段占据圆环的一个扇形区域。扇形的角度范围基于该阶段的教学时间比例动态分配。每个扇区内部按教学行为类型（教师讲授、学生发言、教师提问、课堂沉寂等）进行分层展示，层级数量由该行为出现的频次决定。切片的长度对应单个教学行为的持续时间，采用白色半透明边框增强视觉区分度。支持鼠标滚轮缩放和拖拽平移，悬停时显示详细的教学行为信息（行为类型、时间段、具体内容）。该可视化帮助教师直观分析课堂互动模式在时间维度上的分布特征。",
+    category: "timeline",
+    tags: ["SVG", "Rose Chart", "Polar Coordinates", "Teaching Analytics"],
+    component: RingChart,
+    prompt: ringChartPrompt,
+    metadata: {
+      dataSource: "课堂实录 JSONL 数据",
+      tools: ["SVG", "极坐标系统", "交互式缩放/拖拽"],
+      createdAt: "2024-06-15",
+      inspiration:
+        "基于课堂教学研究，将线性时间轴转换为环形结构，直观展示不同阶段的教学行为分布。",
     },
   },
 ];
