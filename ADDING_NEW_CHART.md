@@ -94,33 +94,78 @@ export function MyChart() {
   );
 }
 
-// 导出代码示例（用于代码查看器）
-export const myChartCode = {
-  core: `// 核心绘制逻辑
-function drawChart(ctx, data) {
-  // 绘制代码
-}`,
-  
-  data: `// 数据生成逻辑
+// 导出提示词（用于 AI 工具复现可视化）
+export const myChartPrompt = `# 图表标题 - 可视化描述
+
+请创建一个[图表类型]组件，用于[可视化目的]。
+
+## 一、功能概述
+- 功能描述 1
+- 功能描述 2
+
+## 二、数据结构
+
+### 数据接口
+\`\`\`typescript
+interface DataItem {
+  // 类型定义
+}
+\`\`\`
+
+## 三、颜色配置
+\`\`\`typescript
+const colors = [
+  "#3b82f6",
+  "#22d3cee",
+];
+\`\`\`
+
+## 四、数据处理
+
+### 数据生成函数
+\`\`\`typescript
 function generateData() {
-  return {
-    // 数据结构
-  };
-}`,
-  
-  styles: `// 样式配置
-const colors = ["#3b82f6", "#22d3ee"];
-const fontSize = 12;`,
-  
-  full: `// 完整的组件代码
-// 包含上述所有部分的完整实现`,
+  // 数据生成逻辑
+}
+\`\`\`
+
+## 五、核心绘制函数
+
+### 渲染逻辑
+\`\`\`typescript
+function draw() {
+  // 绘制代码
+}
+\`\`\`
+
+## 六、交互事件
+
+### 鼠标事件处理
+\`\`\`typescript
+const handleMouseMove = (e) => {
+  // 事件处理
 };
+\`\`\`
+
+## 七、使用 React Hooks
+
+\`\`\`typescript
+export function MyChart() {
+  // 组件实现
+}
+\`\`\`
+
+---
+技术要点：
+1. 技术要点 1
+2. 技术要点 2
+`;
 ```
 
 **组件要求：**
 - 使用 `"use client"` 指令（Next.js 客户端组件）
 - 导出图表组件函数
-- 导出包含 4 个字段的代码对象：`core`、`data`、`styles`、`full`
+- 导出提示词字符串（用于 AI 工具如 Cursor 复现可视化）
 - 推荐使用 Canvas 或 SVG 进行渲染
 - 支持响应式布局
 
@@ -129,9 +174,9 @@ const fontSize = 12;`,
 编辑 `components/works/index.ts`，添加导出语句：
 
 ```tsx
-export { ForceGraph, forceGraphCode } from "./ForceGraph";
-export { StreamGraph, streamGraphCode } from "./StreamGraph";
-export { MyChart, myChartCode } from "./MyChart";  // 新增
+export { ForceGraph, forceGraphPrompt } from "./ForceGraph";
+export { StreamGraph, streamGraphPrompt } from "./StreamGraph";
+export { MyChart, myChartPrompt } from "./MyChart";  // 新增
 ```
 
 ### 步骤 3: 注册到 workRegistry
@@ -139,7 +184,7 @@ export { MyChart, myChartCode } from "./MyChart";  // 新增
 编辑 `registry/workRegistry.ts`，在 `workRegistry` 数组中添加新条目：
 
 ```tsx
-import { MyChart, myChartCode } from "@/components/works/MyChart";  // 导入
+import { MyChart, myChartPrompt } from "@/components/works/MyChart";  // 导入
 
 export const workRegistry: VisualizationWork[] = [
   // ...现有图表
@@ -152,12 +197,7 @@ export const workRegistry: VisualizationWork[] = [
     category: "interactive",            // 分类（见下方说明）
     tags: ["Canvas", "Animation", "Interactive"],  // 技术标签
     component: MyChart,                 // 组件引用
-    sourceCode: {
-      core: myChartCode.core,
-      data: myChartCode.data,
-      styles: myChartCode.styles,
-      full: myChartCode.full,
-    },
+    prompt: myChartPrompt,               // 提示词（用于 AI 工具复现可视化）
     metadata: {
       dataSource: "数据来源说明",        // 可选
       tools: ["Canvas2D", "自定义算法"], // 可选
@@ -205,7 +245,7 @@ export const workRegistry: VisualizationWork[] = [
    - ✓ 数据文件正确加载（如有外部数据）
    - ✓ 响应式布局正常
    - ✓ 交互功能正常
-   - ✓ 代码查看器显示正确
+   - ✓ 提示词显示正确
    - ✓ 分类筛选正常
 
 ## 最佳实践
@@ -628,11 +668,23 @@ components/works/MyChart/
   - 清晰的类型定义、常量配置、工具函数分离
   - 3 个独立子组件：PatternDetailModal、PatternMiningTable、InteractionTree
 
-### 代码示例
-- `core`: 包含核心绘制/计算逻辑
-- `data`: 包含数据生成/处理逻辑
-- `styles`: 包含颜色、字体等样式配置
-- `full`: 包含完整的可运行代码
+### 提示词编写建议
+
+提示词应该包含以下内容，方便 AI 工具（如 Cursor）复现可视化：
+
+1. **标题和概述**：清晰描述可视化的类型和用途
+2. **功能概述**：列出核心功能点
+3. **数据结构**：定义所有接口和类型
+4. **配置项**：颜色、尺寸等常量配置
+5. **数据处理**：数据生成和处理的完整逻辑
+6. **核心算法**：核心计算或渲染逻辑
+7. **交互事件**：鼠标、键盘等事件处理
+8. **组件实现**：完整的组件代码结构
+9. **技术要点**：关键实现细节和注意事项
+
+---
+
+**格式建议**：使用 Markdown 格式，代码块用 `\`\`\`tsx` 或 `\`\`\`typescript` 标记，关键部分使用标题（##、###）进行分段。
 
 ## 示例参考
 
@@ -669,6 +721,7 @@ A: 项目已集成 `next-themes`，使用 Tailwind 的暗色类或读取主题�
 ## 相关文件
 
 - [types/work.ts](types/work.ts) - 类型定义
+- [components/ui/PromptViewer.tsx](components/ui/PromptViewer.tsx) - 提示词查看器组件
 - [components/WorkCard.tsx](components/ui/WorkCard.tsx) - 作品卡片组件
 - [components/WorkDetail.tsx](components/WorkDetail.tsx) - 详情页组件
 - [components/HomeGallery.tsx](components/HomeGallery.tsx) - 首页画廊
