@@ -3,6 +3,7 @@ import { ForceGraph, forceGraphPrompt } from "@/components/works/ForceGraph";
 import { StreamGraph, streamGraphPrompt } from "@/components/works/StreamGraph";
 import { TeachTree, teachTreePrompt } from "@/components/works/TeachTree";
 import { RingChart, ringChartPrompt } from "@/components/works/RingChart";
+import { LagSequentialAnalysis, lagSequentialAnalysisPrompt } from "@/components/works/LagSequentialAnalysis";
 
 export const workRegistry: VisualizationWork[] = [
   {
@@ -83,6 +84,26 @@ export const workRegistry: VisualizationWork[] = [
       createdAt: "2024-06-15",
       inspiration:
         "基于课堂教学研究，将线性时间轴转换为环形结构，直观展示不同阶段的教学行为分布。",
+    },
+  },
+  {
+    id: "lag-sequential-analysis",
+    title: "滞后序列分析热力图",
+    subtitle: "基于 Z-Score 的课堂行为模式显著性分析",
+    description:
+      "一个基于滞后序列分析 (Lag Sequential Analysis, LSA) 的热力图可视化，识别教学行为转移的显著模式。使用调整后标准化残差 (Z-Score) 区分显著正负相关与随机噪音。",
+    fullDescription:
+      "该可视化通过分析课堂实录数据的时间序列，构建观测矩阵（实际转移次数）和期望矩阵（随机情况下的理论频次），然后计算调整后标准化残差 (Z-Score) 来判断行为转移模式的显著性。热力图中，行表示前一行为 (t)，列表示后一行为 (t+1)，单元格显示 Z-Score 值。Z > 1.96 用红色表示显著正相关，说明该行为模式显著存在；Z < -1.96 用蓝色表示显著负相关，说明该行为模式被抑制；灰色区域表示无显著性的随机噪音。右侧智能分析面板自动列出 Z-Score 最高和最低的前 3 个模式，帮助教师快速识别课堂中的核心互动模式。支持多种图表比例切换，适应不同屏幕尺寸。",
+    category: "network",
+    tags: ["SVG", "LSA Algorithm", "Heatmap", "Statistical Analysis", "Interactive"],
+    component: LagSequentialAnalysis,
+    prompt: lagSequentialAnalysisPrompt,
+    metadata: {
+      dataSource: "课堂实录 JSONL 数据",
+      tools: ["SVG", "滞后序列分析算法", "Z-Score 计算"],
+      createdAt: "2024-06-20",
+      inspiration:
+        "基于 Bakeman 和 Gottman 的序列分析理论，将传统的统计学方法应用于课堂行为分析，识别非随机的教学互动模式。",
     },
   },
 ];

@@ -167,7 +167,9 @@ export function MyChart() {
 - 导出图表组件函数
 - 导出提示词字符串（用于 AI 工具如 Cursor 复现可视化）
 - 推荐使用 Canvas 或 SVG 进行渲染
-- 支持响应式布局
+- 支持响应式布局（自适应容器尺寸）
+- **必须支持鼠标滚轮缩放和拖拽平移**
+- **保持界面简洁，不要添加描述性文字**
 
 ### 步骤 2: 在 index.ts 中导出
 
@@ -243,8 +245,10 @@ export const workRegistry: VisualizationWork[] = [
 4. 测试功能：
    - ✓ 图表正常渲染
    - ✓ 数据文件正确加载（如有外部数据）
-   - ✓ 响应式布局正常
-   - ✓ 交互功能正常
+   - ✓ 响应式布局正常（容器尺寸变化时图表自适应）
+   - ✓ 鼠标滚轮缩放功能正常
+   - ✓ 鼠标拖拽平移功能正常
+   - ✓ 拖拽时鼠标指针变为 `grabbing`
    - ✓ 提示词显示正确
    - ✓ 分类筛选正常
 
@@ -256,83 +260,20 @@ export const workRegistry: VisualizationWork[] = [
 - 使用 `useCallback` 和 `useMemo` 优化性能
 - Canvas 图表考虑离屏渲染
 
-### 图表比例自适应
+### 图表自适应与交互要求
 
-所有图表组件必须支持以下比例自适应：**1:1、16:9、9:16、3:4、4:3**，以及任意屏幕尺寸自适应。
+> **重要提示：画布比例切换功能已由父组件集成，图表组件无需实现比例切换器。**
 
-#### 基础实现模式
+所有图表组件必须遵循以下核心要求：
 
-使用 `ResizeObserver` 监听容器尺寸变化，并根据当前容器的宽高比动态计算图表绘制区域：
+#### 1. 图表自适应
+
+图表必须自适应容器尺寸，使用 `ResizeObserver` 监听容器变化：
 
 ```tsx
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-
-// 支持的目标比例
-type AspectRatio = "1:1" | "16:9" | "9:16" | "3:4" | "4:3" | "auto";
-
-// 比例计算辅助函数
-function getAspectRatioValue(ratio: AspectRatio): number {
-  const ratioMap: Record<AspectRatio, number> = {
-    "1:1": 1,
-    "16:9": 16 / 9,
-    "9:16": 9 / 16,
-    "3:4": 3 / 4,
-    "4:3": 4 / 3,
-    "auto": 0, // 表示自动适应
-  };
-  return ratioMap[ratio];
-}
-
-// 计算适应容器后的绘制区域尺寸
-function calculateDrawArea(
-  containerWidth: number,
-  containerHeight: number,
-  targetRatio: AspectRatio,
-  padding = 16
-): { width: number; height: number; offsetX: number; offsetY: number } {
-  const effectiveWidth = containerWidth - padding * 2;
-  const effectiveHeight = containerHeight - padding * 2;
-
-  if (targetRatio === "auto") {
-    // 自动适应：填充整个容器
-    return {
-      width: effectiveWidth,
-      height: effectiveHeight,
-      offsetX: padding,
-      offsetY: padding,
-    };
-  }
-
-  const targetRatioValue = getAspectRatioValue(targetRatio);
-  const containerRatio = effectiveWidth / effectiveHeight;
-
-  let drawWidth: number;
-  let drawHeight: number;
-
-  if (containerRatio > targetRatioValue) {
-    // 容器比目标更宽，以高度为基准
-    drawHeight = effectiveHeight;
-    drawWidth = drawHeight * targetRatioValue;
-  } else {
-    // 容器比目标更窄，以宽度为基准
-    drawWidth = effectiveWidth;
-    drawHeight = drawWidth / targetRatioValue;
-  }
-
-  // 居中偏移
-  const offsetX = (containerWidth - drawWidth) / 2;
-  const offsetY = (containerHeight - drawHeight) / 2;
-
-  return { width: drawWidth, height: drawHeight, offsetX, offsetY };
-}
-
 export function MyChart() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
 
   // 监听容器尺寸变化
   useEffect(() => {
@@ -346,167 +287,98 @@ export function MyChart() {
     });
 
     resizeObserver.observe(containerRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
+    return () => resizeObserver.disconnect();
   }, []);
 
-  // 图表绘制逻辑
+  // 根据容器尺寸绘制图表
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || containerSize.width === 0 || containerSize.height === 0) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // 计算绘制区域
-    const drawArea = calculateDrawArea(
-      containerSize.width,
-      containerSize.height,
-      aspectRatio
-    );
-
-    // 设置 Canvas 尺寸
-    canvas.width = drawArea.width;
-    canvas.height = drawArea.height;
-
-    // 清空画布
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 绘制图表内容（使用 drawArea.width 和 drawArea.height）
-    drawChart(ctx, drawArea.width, drawArea.height);
-  }, [containerSize, aspectRatio]);
+    if (containerSize.width === 0) return;
+    // 使用 containerSize.width 和 containerSize.height 绘制
+  }, [containerSize]);
 
   return (
-    <div className="w-full h-full bg-white">
-      {/* 比例切换器 */}
-      <div className="flex gap-2 p-2 border-b">
-        {(["1:1", "16:9", "9:16", "3:4", "4:3", "auto"] as AspectRatio[]).map((ratio) => (
-          <button
-            key={ratio}
-            onClick={() => setAspectRatio(ratio)}
-            className={`px-3 py-1 rounded text-sm transition-colors ${
-              aspectRatio === ratio
-                ? "bg-blue-500 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            {ratio}
-          </button>
-        ))}
-      </div>
-
-      {/* 图表容器 */}
-      <div ref={containerRef} className="w-full h-full p-4">
-        <canvas
-          ref={canvasRef}
-          className="mx-auto"
-          style={{
-            width: `${calculateDrawArea(containerSize.width, containerSize.height, aspectRatio).width}px`,
-            height: `${calculateDrawArea(containerSize.width, containerSize.height, aspectRatio).height}px`,
-          }}
-        />
-      </div>
+    <div ref={containerRef} className="w-full h-full overflow-hidden">
+      {/* 图表内容 */}
     </div>
   );
 }
-
-function drawChart(ctx: CanvasRenderingContext2D, width: number, height: number) {
-  // 你的图表绘制逻辑
-  // 使用 width 和 height 作为绘制边界
-}
 ```
 
-#### SVG 版本
+#### 2. 缩放与拖拽功能
 
-对于 SVG 图表，使用 `viewBox` 实现自适应：
+图表必须支持鼠标滚轮缩放和拖拽平移：
 
 ```tsx
-export function MySVGChart() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
+export function MyChart() {
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+  // 滚轮缩放
+  const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newScale = Math.max(0.3, Math.min(5, transform.scale * delta));
+    setTransform(prev => ({ ...prev, scale: newScale }));
+  };
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        setContainerSize({ width, height });
-      }
-    });
+  // 拖拽开始
+  const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.button === 0) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - transform.x, y: e.clientY - transform.y });
+    }
+  };
 
-    resizeObserver.observe(containerRef.current);
+  // 拖拽移动
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (isDragging) {
+      setTransform(prev => ({
+        ...prev,
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      }));
+    }
+  };
 
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, []);
-
-  const drawArea = calculateDrawArea(
-    containerSize.width,
-    containerSize.height,
-    aspectRatio
-  );
+  // 拖拽结束
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
 
   return (
-    <div className="w-full h-full bg-white">
-      {/* 比例切换器 */}
-      <div className="flex gap-2 p-2 border-b">
-        {(["1:1", "16:9", "9:16", "3:4", "4:3", "auto"] as AspectRatio[]).map((ratio) => (
-          <button
-            key={ratio}
-            onClick={() => setAspectRatio(ratio)}
-            className={`px-3 py-1 rounded text-sm transition-colors ${
-              aspectRatio === ratio
-                ? "bg-blue-500 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            {ratio}
-          </button>
-        ))}
-      </div>
-
-      {/* 图表容器 */}
-      <div ref={containerRef} className="w-full h-full flex items-center justify-center p-4">
-        <svg
-          width={drawArea.width}
-          height={drawArea.height}
-          viewBox={`0 0 ${drawArea.width} ${drawArea.height}`}
-        >
-          {/* SVG 绘制内容 */}
-          <circle cx={drawArea.width / 2} cy={drawArea.height / 2} r={Math.min(drawArea.width, drawArea.height) * 0.4} />
-        </svg>
-      </div>
+    <div className="w-full h-full overflow-hidden bg-white">
+      <svg
+        width={containerSize.width}
+        height={containerSize.height}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => setIsDragging(false)}
+        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+      >
+        <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
+          {/* 图表内容 */}
+        </g>
+      </svg>
     </div>
   );
 }
 ```
 
-#### 实现要点
+#### 3. 保持图表简洁
 
-1. **容器监听**：始终使用 `ResizeObserver` 监听容器尺寸变化
-2. **比例计算**：根据容器宽高比和目标比例计算绘制区域
-3. **居中显示**：绘制区域在容器中居中，保持两侧留白
-4. **状态管理**：使用状态管理当前选择的比例
-5. **即时响应**：容器尺寸或比例变化时，立即重新绘制
+图表界面必须干净，**不要添加任何描述性文字**：
 
-#### 测试要求
+- ✅ 只显示图表本身（图例、标签等必要元素除外）
+- ✅ 不要添加"算法说明"、"功能描述"等文字内容
+- ✅ 不要添加标题、副标题等装饰性文字
+- ✅ 不需要实现比例切换按钮（由父组件提供）
 
-在以下场景下测试图表是否正常显示：
-
-| 比例 | 测试容器尺寸 | 预期行为 |
-|------|------------|---------|
-| 1:1 | 800x600 | 正方形居中，左右有留白 |
-| 16:9 | 800x600 | 宽矩形，占满宽度 |
-| 9:16 | 800x600 | 高矩形，占满高度 |
-| 3:4 | 800x600 | 较高矩形，占满高度 |
-| 4:3 | 800x600 | 较宽矩形，占满宽度 |
-| auto | 任意尺寸 | 填充整个容器 |
-| 所有比例 | 移动端 | 正确响应触摸操作 |
+**参考示例：**
+- `components/works/LagSequentialAnalysis/index.tsx` - 干净的图表实现示例
+- `components/works/RingChart/index.tsx` - 拖拽和缩放实现示例
 
 ### 响应式设计
 - 监听窗口大小变化
@@ -693,7 +565,7 @@ components/works/MyChart/
   - Canvas 渲染
   - 物理模拟
   - 拖拽交互
-  
+
 - **流图**: `components/works/StreamGraph/index.tsx`
   - Canvas 渲染
   - 时间序列数据
@@ -703,6 +575,17 @@ components/works/MyChart/
   - 外部数据加载（`public/TeachTree.jsonl`）
   - 层次化数据可视化
   - 数据文件与组件同名示例
+
+- **教学阶段玫瑰图**: `components/works/RingChart/index.tsx`
+  - SVG 渲染
+  - 鼠标滚轮缩放和拖拽平移
+  - 响应式布局
+
+- **滞后序列分析热力图**: `components/works/LagSequentialAnalysis/index.tsx`
+  - SVG 渲染
+  - 鼠标滚轮缩放和拖拽平移
+  - 干净的界面，无描述性文字
+  - 自适应容器尺寸
 
 ## 常见问题
 
@@ -717,6 +600,15 @@ A: 使用 `requestAnimationFrame` 创建动画循环，通过时间差计算插�
 
 ### Q: 如何支持暗色模式？
 A: 项目已集成 `next-themes`，使用 Tailwind 的暗色类或读取主题状态调整颜色。
+
+### Q: 如何实现缩放和拖拽？
+A: 参考上方"图表自适应与交互要求"部分的示例代码，使用 SVG 的 `transform` 属性实现平移和缩放，监听 `wheel` 和 `mousedown/mousemove/mouseup` 事件。
+
+### Q: 需要实现比例切换按钮吗？
+A: 不需要。画布比例切换功能已由父组件集成，图表组件只需自适应容器尺寸即可。
+
+### Q: 图表可以添加说明文字吗？
+A: 不建议。保持图表简洁，只显示可视化内容本身。必要的标签、图例除外。
 
 ## 相关文件
 
